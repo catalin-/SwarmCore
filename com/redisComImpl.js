@@ -37,6 +37,14 @@ function RedisComImpl(){
         errLog("Redis error", error);
     }
 
+    bindAllMembers = function(object){
+        for(var property in object){
+            if(typeof object[property] == 'function'){
+                object[property] = object[property].bind(object);
+            }
+        }
+    }
+
     function onCmdRedisReady(error){
         console.log("Node " + thisAdapter.nodeName + " ready for swarms!");
         bindAllMembers(redisClient);
@@ -180,7 +188,7 @@ function RedisComImpl(){
         }
         assertNodeInGroup(specificNode,groupNode);
         var redisKey = makeRedisKey("groupMembers",groupNode);
-        console.log("Modifying for ", redisKey, specificNode, offset);
+        console.log("Modifying counter: ", redisKey, specificNode, offset);
         redisClient.hincrby.async(redisKey,specificNode, offset);
     }
 
@@ -426,6 +434,8 @@ function RedisComImpl(){
     function sendSwarm(swarm){
 
         function doSend(specificNodeName){
+            dprint("Sending swarm towards " + specificNodeName + " swarm:" + M(swarm));
+
             swarm.meta.targetNodeName = specificNodeName;
             if(dslUtil.handleErrors(swarm)){
                 persistSwarmState.async(swarm);
@@ -524,9 +534,9 @@ function RedisComImpl(){
             } else {
                 callback(null,"null");
                 if(groupName != "Logger"){
-                    errLog("Missing any node in group [" + groupName + "]")
+                    errLog("Missing any node in group [" + groupName + "]\n")
                 } else{
-                    localLog("missing","Error: Missing logger nodes!!!");
+                    localLog("missing","Error: Missing any logger!!!\n");
                 }
             }
         }).wait(values);
