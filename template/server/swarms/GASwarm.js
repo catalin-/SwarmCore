@@ -19,8 +19,12 @@ var logGAData =
         node:"Analytics",
         do : function (){
             console.log("doCrawl");
-            this.result = doAnalytics();
-            this.swarm("doMetrics");
+            var self = this;
+            var result = doAnalytics.async();
+            (function(result){
+                self.result = result;
+                self.swarm("doMetrics");
+            }).swait(result);
         }
     },
     doMetrics: { //phase that should be replaced. Use your own logging logic
@@ -33,9 +37,13 @@ var logGAData =
     doSave: { //phase that should be replaced. Use your own logging logic
         node: "MySqlAdapter",
         do: function () {
+            var self = this;
             console.log("doSave");
-            doSave(this.data);
-            this.home("success");
+            var ret = doSave.async(this.result);
+            (function(ret){
+                self.recordInfo = ret;
+                self.home("success");
+            }).swait(ret);
         }
     }
 }

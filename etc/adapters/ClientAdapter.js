@@ -4,11 +4,11 @@ var sutil   = require('../../lib/TCPSockUtil.js');
 //global sessionsRegistry object
 sessionsRegistry  = require("../../lib/SessionRegistry.js").getRegistry();
 
-var serverSocketAvailable = false;
+var serverSocketAvailable = true;
 
 thisAdapter = require ("../../lib/SwarmCore.js").createAdapter("ClientAdapter");
 
-globalVerbosity = true;
+globalVerbosity = false;
 thisAdapter.loginSwarmingName = "login.js";
 
 /* for monitoring*/
