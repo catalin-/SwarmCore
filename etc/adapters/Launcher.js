@@ -16,14 +16,28 @@ var waitingCount = 0;
 var restartCount = {};
 var mailMessages = [];
 var config, checkInterval, mailInterval;
-
+var isClosing = false;
 
 /**********************************************************************************************
  * Functions
  **********************************************************************************************/
+getStatus = function() {
+    var adaptors = [];
+    for (var key in adaptorForks) {
+        adaptors.push(key);
+    }
+    return {
+        systemId: getMyConfig("systemId"),
+        nodes: adaptors,
+        alive: !isClosing
+    }
+}
 
+    
+    
 var MAX_RESTART_LEVEL = 10000;
 
+var mailIntervalTick, forkListenerTick;
 (function init() {
     var i, len, adaptorList, localDelay, adapter;
 
@@ -71,19 +85,23 @@ var MAX_RESTART_LEVEL = 10000;
     }
 
     setTimeout(function () {
-        setInterval(function () {
+        //startSwarm('ping.js', 'dispatch', [getStatus()]);
+        forkListenerTick = setInterval(function () {
             listenForks();
         }, checkInterval);
         listenForks();
     }, 2000);
 
-    setInterval(function () {
+    mailIntervalTick = setInterval(function () {
         sendMessages();
     }, mailInterval);
 
 })();
 
-
+function cleanUp() {
+    clearInterval(forkListenerTick);
+    clearInterval(mailIntervalTick);
+}
 function createAdaptor(adaptorConfig) {
     var instanceCount;
     if (adaptorConfig.node == undefined) {
@@ -129,10 +147,12 @@ function createFork(adaptorConfig, index, maxIndex) {
 
 function killFork(fork) {
     try {
-        fork.removeAllListeners();
         fork.disconnect();
-        fork.kill();
-        } catch (err) {
+        fork.kill('SIGINT');
+        /*var isAlive = !fork.killed ? "alive" : "dead";
+        console.log('Kill process ' + fork.pid + ' | status = ' + isAlive);
+        console.log(fork);*/
+    } catch (err) {
         console.log(err);
     }
 }
@@ -189,6 +209,13 @@ function tryConnectionToFork(adaptorFork, doneCallback) {
 
 
 function checkForksState() {
+    //check if Launcher is closing
+    /*var ss = isClosing ? "closing" : "alive";
+    console.log("Check for state - " + ss);*/
+    if (isClosing) {
+        return;
+    }
+    
     var fork, lastMessage, key, i, len;
     var forRestart = [];
 
@@ -263,33 +290,56 @@ function sendMessages() {
 
 function killAllForks() {
     var fork, key;
+    isClosing = true;
+
+    cleanUp();
+    startSwarm('ping.js', 'dispatch', [getStatus()]);
     try {
         for (key  in adaptorForks) {
             fork = adaptorForks[key];
+            delete adaptorForks[key];
             killFork(fork);
         }
+
     } catch (e) {
         console.log(e);
     }
+
+    setTimeout(function () {
+        //just kill it for now
+        process.exit();
+    }, 3000);
+
 }
 
 process.on('exit', function () {
+    //logErr('Launcher exit.');
+    console.log('Got close for process ' + process.pid);
     killAllForks();
-    logErr('Launcher exit.');
 });
 
 process.on('SIGTERM', function () {
+    //logErr('Got SIGTERM.');
+    console.log('Got SIGTERM for process ' + process.pid);
     killAllForks();
-    logErr('Got SIGTERM.');
 });
 
 process.on('SIGHUP', function () {
+    //logErr('Got SIGHUP.');
+    console.log('Got SIGHUP for process ' + process.pid);
     killAllForks();
-    logErr('Got SIGHUP.');
 });
 
 process.on('SIGINT', function () {
+    //logErr('Got SIGINT.');
+    console.log('Got SIGINT for process ' + process.pid);
     killAllForks();
-    logErr('Got SIGINT.');
 });
 
+//hackintosh  
+process.on("uncaughtException", function (error) {
+    if (error.toString() !== 'Error: IPC channel is already disconnected') {
+        process.stderr.write(error.stack);
+        process.exit(1);
+    }
+}); 
