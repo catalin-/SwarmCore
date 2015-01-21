@@ -43,7 +43,7 @@
   ],
   "_id": "swarmcore@2.0.1",
   "dependencies" : {
-    "swarmutil" : ">=1.0.9",
+    /*"swarmutil" : ">=1.0.9",*/
     "asynchron" : ">=1.0.3",
     "redsindex" : ">=0.1.0",
     "clone" : ">=0.1.8",
