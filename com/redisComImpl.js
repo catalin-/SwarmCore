@@ -14,16 +14,27 @@ function RedisComImpl(){
     var self = this;
     var redisHost = thisAdapter.config.Core.redisHost;
     var redisPort = thisAdapter.config.Core.redisPort;
+    var RateLimiter = require('limiter2').RateLimiter;
+
+    var throttlerConfig = {
+        limit:10000,
+        timeUnit:"minutes"
+    };
+
+    loadThrottlerConfig(throttlerConfig, "Core");
+    loadThrottlerConfig(throttlerConfig, thisAdapter.mainGroup);
 
     var MAX_REBORNCOUNTER = 100;
 
     var pubsubRedisClient = redis.createClient(redisPort, redisHost);
     var redisClient  = null;
+
     pubsubRedisClient.retry_delay = 1000;
     pubsubRedisClient.max_attempts = 100;
     pubsubRedisClient.on("error", onRedisError);
     pubsubRedisClient.on("ready", function(){
         redisClient = redis.createClient(redisPort, redisHost);
+        this.privateRedisClient = redisClient;
         redisClient.retry_delay = 2000;
         redisClient.max_attempts = 20;
         redisClient.on("error", onRedisError);
@@ -32,6 +43,13 @@ function RedisComImpl(){
     });
 
     var pendingInitialisationCalls = [];
+
+    var limiter = new RateLimiter(throttlerConfig.limit, throttlerConfig.timeUnit);
+    this.resetThrottler = function(limit, timeUnit){
+        throttlerConfig.limit = limit;
+        throttlerConfig.timeUnit = timeUnit;
+        limiter = new RateLimiter(limit, timeUnit);
+    }
 
     function onRedisError(error){
         errLog("Redis error", error);
@@ -56,6 +74,9 @@ function RedisComImpl(){
         }
         self.redisReady = true;
         self.joinGroup(thisAdapter.mainGroup, true);
+        saveHistoricNodeInfo(thisAdapter.nodeName, "startTime",Date.now());
+        saveHistoricNodeInfo(thisAdapter.nodeName, "mainGroup",thisAdapter.mainGroup);
+        saveHistoricNodeInfo(thisAdapter.nodeName, "systemId",thisAdapter.systemId);
         self.joinGroup("All");
         for(var i = 0, l = pendingInitialisationCalls.length; i<l; i++){
             var call =  pendingInitialisationCalls[i];
@@ -190,6 +211,11 @@ function RedisComImpl(){
         var redisKey = makeRedisKey("groupMembers",groupNode);
         console.log("Modifying counter: ", redisKey, specificNode, offset);
         redisClient.hincrby.async(redisKey,specificNode, offset);
+    }
+
+    function incGroupsUse(groupName){
+        var redisKey = makeRedisKey("groups","members");
+        redisClient.hincrby.async(redisKey,groupName, 1);
     }
 
     function decNodeUse(groupNode, specificNode){
@@ -349,7 +375,6 @@ function RedisComImpl(){
         swarm.meta.currentStage = blockName;  // "done", "failed", "aborted", "finished";
         if(dslUtil.blockExist(swarm, blockName)){
             thisAdapter.executeMessage(swarm);
-
         }
     }
 
@@ -390,9 +415,16 @@ function RedisComImpl(){
     }
 
 
+    var totalPhaseCounter = 0;
     /* pottentia to add additional locking/verifications before executing a received swarm */
     this.asyncExecute = function(swarm, callback){
-        callback.apply(swarm);
+        if(limiter.accept(1)){
+            totalPhaseCounter++;
+            saveHistoricNodeInfo(thisAdapter.nodeName, "executedPhasesCounter", totalPhaseCounter);
+            callback.apply(swarm);
+        } else {
+            logErr("Limit exceeded, throttling requests!");
+        }
     }
 
     var homeHandler;
@@ -555,6 +587,7 @@ function RedisComImpl(){
     }
 
     this.joinGroup = function(groupName, isMain){
+        incGroupsUse(groupName);
         if(self.redisReady){
             doJoin(groupName, isMain);
         } else {
@@ -562,6 +595,14 @@ function RedisComImpl(){
              doJoin(groupName, isMain);
          });
         }
+    }
+
+    function saveHistoricNodeInfo(nodeName, type, value){
+        var redisKey = makeRedisKey("historicInfo",nodeName);
+        var result = redisClient.hset.async(redisKey, type, value);
+        /*(function(result){
+         callBack(null, result);
+         }).swait(result);*/
     }
 
     function getNodeGroups(nodeName, callback){
@@ -585,6 +626,9 @@ function RedisComImpl(){
             for(var groupName in nodes){
                 var redisKey = makeRedisKey("groupMembers",groupName);
                 var res = redisClient.hdel.async(redisKey, nodeName);
+                saveHistoricNodeInfo(nodeName, "stopAcknowledgedBy", thisAdapter.nodeName);
+                saveHistoricNodeInfo(nodeName, "stopTime",Date.now());
+
                 if(nodes[groupName] == "mainGroup"){
                     (function(res){
                         //return result
@@ -670,6 +714,7 @@ function RedisComImpl(){
         return thisAdapter.coreId+":"+type+":"+ mainBranch;
     }
 
+    this.makeRedisKey = makeRedisKey;
 
     function uploadFile(fullFileName, fileName) {
         try {
