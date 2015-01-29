@@ -2,14 +2,14 @@ var go      = require('../../lib/GenericOutlet.js');
 
 //global sessionsRegistry object
 sessionsRegistry  = require("../../lib/SessionRegistry.js").getRegistry();
-globalVerbosity = true;
+globalVerbosity = false;
 
-var serverSocketAvailable = false;
+var serverSocketAvailable = true;
 
 thisAdapter = require ("../../lib/SwarmCore.js").createAdapter("WSServer");
 
 thisAdapter.loginSwarmingName = "login.js";
-thisAdapter.joinGroup("@ClientAdapters");
+//thisAdapter.joinGroup("@ClientAdapters");
 
 /* for monitoring*/
 var socketDetails = "";

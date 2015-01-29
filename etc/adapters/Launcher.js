@@ -48,7 +48,7 @@ var mailIntervalTick, forkListenerTick;
     mailInterval = parseInt(config.mailInterval);
 
     if (!checkInterval) {
-        checkInterval = 1000;
+        checkInterval = 2000;
     }
     if (!mailInterval) {
         mailInterval = 61000;
