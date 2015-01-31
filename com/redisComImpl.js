@@ -28,13 +28,13 @@ function RedisComImpl(){
 
     var pubsubRedisClient = redis.createClient(redisPort, redisHost);
     var redisClient  = null;
-
+    
     pubsubRedisClient.retry_delay = 1000;
     pubsubRedisClient.max_attempts = 100;
     pubsubRedisClient.on("error", onRedisError);
     pubsubRedisClient.on("ready", function(){
         redisClient = redis.createClient(redisPort, redisHost);
-        this.privateRedisClient = redisClient;
+        self.privateRedisClient = redisClient;
         redisClient.retry_delay = 2000;
         redisClient.max_attempts = 20;
         redisClient.on("error", onRedisError);

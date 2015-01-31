@@ -1,13 +1,11 @@
 var adapterPort         = 3000;
 var adapterHost         = "localhost";
-var util                = require("swarmutil");
+var util                = require("../../nodeClient/nodeClient.js");
 var assert              = require('assert');
 
-swarmSettings.authentificationMethod = "testCtor";
+var client             = util.createClient(adapterHost, adapterPort, "BenchmarkUser", "ok","BenchmarkTest", 'testCtor');
 
-var client             = util.createClient(adapterHost, adapterPort, "BenchmarkUser", "ok","BenchmarkTest");
-
-client.startSwarm("BenchMark.js","start",9024);
+client.startSwarm("BenchMark.js","start",900024);
 
 client.on("BenchMark.js",getGreetings);
 
