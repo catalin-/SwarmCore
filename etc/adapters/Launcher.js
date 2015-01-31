@@ -2,7 +2,7 @@
  * Init
  **********************************************************************************************/
 var core = require ("../../lib/SwarmCore.js");
-core.createAdapter("Launcher");
+thisAdapter = core.createAdapter("Launcher");
 
 
 /**********************************************************************************************
@@ -27,7 +27,7 @@ getStatus = function() {
         adaptors.push(key);
     }
     return {
-        systemId: getMyConfig("systemId"),
+        systemId: thisAdapter.systemId,
         nodes: adaptors,
         alive: !isClosing
     }
